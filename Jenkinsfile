@@ -107,7 +107,7 @@ EOF
               # ---- Resolve image + tag ----
               IMAGE="docker.io/${IMAGE_NAME}"   # e.g., docker.io/mrojas444/java17-springboot-test
               if [ -f "${WORKSPACE}/.gitsha" ] && [ -s "${WORKSPACE}/.gitsha" ]; then
-                TAG="$(cat "${WORKSPACE}/.gitsha")"
+                TAG="$(cat "${WORKSPACE}/.gitsha")-${BUILD_NUMBER}"
               else
                 TAG="$(git -C "${WORKSPACE}" rev-parse --short=8 HEAD 2>/dev/null || echo "${BUILD_NUMBER}")"
               fi
