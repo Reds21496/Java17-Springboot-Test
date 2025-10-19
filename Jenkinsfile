@@ -48,7 +48,6 @@ pipeline {
         }
       }
     }
-
     stage('Verify Tools Container') {
       steps {
         container('tools') {
@@ -62,7 +61,6 @@ pipeline {
         }
       }
     }
-
     stage('Build & Test (Maven)') {
       steps {
         container('maven') {
@@ -148,9 +146,51 @@ EOF
         }
       }
     }
-
-
-
+    stage('Scan Image (Trivy)') {
+      steps {
+        container('tools') {
+          sh '''
+            set -euo
+    
+            echo "🔍 Scanning image docker.io/${IMAGE_NAME}:${TAG} with Trivy..."
+            trivy --version
+    
+            # Download/refresh the vulnerability DB first (cached between runs if possible)
+            trivy image --download-db-only || true
+    
+            trivy image --exit-code 0 --format table --severity HIGH,CRITICAL --ignore-unfixed docker.io/${IMAGE_NAME}:${TAG} | tee trivy-report.txt
+    
+            echo "✅ Trivy scan completed. Results stored in trivy-report.txt"
+    
+            # Uncomment this line if you want to FAIL on high/critical vulnerabilities:
+            # trivy image --exit-code 1 --severity HIGH,CRITICAL docker.io/${IMAGE_NAME}:${TAG}
+          '''
+        }
+      }
+      post {
+        always {
+          echo "📦 Archiving Trivy scan results..."
+          archiveArtifacts artifacts: 'trivy-report.txt', allowEmptyArchive: true
+    
+          // Optional: pretty-print a few lines for quick visibility in the Jenkins log
+          script {
+            if (fileExists('trivy-report.txt')) {
+              echo "---- Trivy Summary ----"
+              sh 'head -n 30 trivy-report.txt || true'
+              echo "-----------------------"
+            } else {
+              echo "⚠️  No Trivy report found to archive."
+            }
+          }
+        }
+        failure {
+          echo "❌ Trivy scan failed or found blocking vulnerabilities."
+        }
+        success {
+          echo "✅ Trivy scan completed successfully (no blocking vulnerabilities)."
+        }
+      }
+    }
   }
 
   post {
